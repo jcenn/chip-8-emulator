@@ -1,10 +1,13 @@
 #include <cstdint>
 #include<cstdio>
 #include <cstring>
+#include <ctime>
 
 #include "chip8.h"
 #include "chip8_debug.h"
 
+#include <time.h>
+#include <cmath>
 
 /// TODO
 /// - implement all opcode cases (debug)
@@ -12,7 +15,7 @@
 /// - Read/Run modes for this emulator
 /// - Read whole rom file
 
-
+const uint16_t CLOCK_RATE = 2; // in Hz
 
 
 int main(int argc, char *argv[]){
@@ -29,6 +32,11 @@ int main(int argc, char *argv[]){
     // read first 64 bytes of chip-8 memory 
 	uint16_t i=0;
 	while(i < 64){
+        // Clock
+        timespec t;
+        t.tv_sec = 0;
+        t.tv_nsec = std::floor(1.0/CLOCK_RATE * 1000 * 1000 * 1000);
+        nanosleep(&t, NULL);
 
         // print the addres of current instruction address and instruction as pseudo-assembly
 		printf("%04x:\t", i);
