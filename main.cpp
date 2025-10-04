@@ -25,7 +25,7 @@ int main(int argc, char *argv[]){
     memset(&chip8->memory, 0, MEM_SIZE);
 
     // handle error while reading the source file
-    if(load_file(argv[1], chip8, 64) != 0){
+    if(load_file(argv[1], chip8) != 0){
         return 0;
     }
 

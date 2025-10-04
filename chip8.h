@@ -20,4 +20,4 @@ struct Chip8{
 };
 
 
-int load_file(char* file_path, Chip8* chip8, uint16_t byte_size);
+int load_file(char* file_path, Chip8* chip8);
