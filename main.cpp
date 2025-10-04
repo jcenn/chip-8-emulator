@@ -1,5 +1,6 @@
 #include <cstdint>
 #include<cstdio>
+#include <cstring>
 
 #include "chip8.h"
 #include "chip8_debug.h"
@@ -18,6 +19,7 @@ int main(int argc, char *argv[]){
 	printf("Chip-8 emulator \n");
     
     Chip8* chip8 = new Chip8();
+    memset(&chip8->memory, 0, MEM_SIZE);
 
     // handle error while reading the source file
     if(load_file(argv[1], chip8, 64) != 0){

@@ -11,7 +11,7 @@ int load_file(char* file_path, Chip8* chip8, uint16_t byte_size){
 
      for(int i=0; i < byte_size; i+=2){
          uint16_t tmp = 0;
-         fread(&tmp, sizeof(uint8_t) * 2, 1, file);
+         int read_bytes = fread(&tmp, sizeof(uint8_t) * 2, 1, file);
         
          // writing the 2 bytes in reverse order to convert from little to big endian
          chip8->memory[i] = tmp;
