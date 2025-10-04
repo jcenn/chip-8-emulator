@@ -10,7 +10,6 @@
 #include <cmath>
 
 /// TODO
-/// - implement all opcode cases (debug)
 /// - add font characters
 /// - Read/Run modes for this emulator
 /// - Read whole rom file
@@ -30,8 +29,8 @@ int main(int argc, char *argv[]){
     }
 
     // read first 64 bytes of chip-8 memory 
-	uint16_t i=0;
-	while(i < 64){
+	uint16_t i=512;
+	while(i < MEM_SIZE){
         // Clock
         timespec t;
         t.tv_sec = 0;
@@ -40,7 +39,7 @@ int main(int argc, char *argv[]){
 
         // print the addres of current instruction address and instruction as pseudo-assembly
 		printf("%04x:\t", i);
-        uint16_t opcode = chip8->memory[i] << 8 | chip8->memory[i+1];
+        uint16_t opcode = chip8->memory[i] << 8 | chip8->memory[i + 1];
         print_instruction(opcode);
 		
         i+=2;
