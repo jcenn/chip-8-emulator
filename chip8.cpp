@@ -41,7 +41,7 @@ int Chip8::load_rom(char* file_path){
     return 0;
 }
 
-void Chip8::execute_instruction(uint16_t opcode){
+uint8_t Chip8::execute_instruction(uint16_t opcode){
     // have to be initialized before switch for compiler reasons
     uint16_t addr = op_address(opcode);
     uint8_t x = op_x(opcode);
@@ -61,7 +61,9 @@ void Chip8::execute_instruction(uint16_t opcode){
             }
             break;
         case 0x1:
-            printf("GOTO %03x \n", addr);
+            //printf("GOTO %03x \n", addr);
+            if(addr < 512 || addr >= 4096) return 1; // ERROR: reading outside memory
+            this->program_counter = addr - 2; // PC is automaticall incremented by 2 after this instruction so we have to offset that
             break;
         case 0x2:
             printf("CALL %03x \n", addr);
@@ -80,7 +82,8 @@ void Chip8::execute_instruction(uint16_t opcode){
             this->registers[x] = lower;
             break;
         case 0x7:
-            printf("ADD (reg: %02x val: %04x) \n", x, lower);
+            //printf("ADD (reg: %02x val: %04x) \n", x, lower);
+            this->registers[x] += lower;
             break;
         case 0x8:
             switch (op_lower(opcode) & 0x0f) {
@@ -133,12 +136,20 @@ void Chip8::execute_instruction(uint16_t opcode){
         case 0xD:
             // printf("DRAW (x: %02x y: %02x n: %04x) \n", this->registers[x], this->registers[y], lower & 0x0f);
             //TODO: need to handle offset lesser than 1 byte
-            for(int i=0; i < (lower & 0x0f); i++){
+            {
                 uint8_t x_val = this->registers[x]; 
                 uint8_t y_val = this->registers[y];
-                vram[y_val+i][x_val/8] = this->memory[this->index_register+i];
+                const uint8_t offset = x_val % 8;
+
+                for(int i=0; i < (lower & 0x0f); i++){
+                    vram[y_val+i][x_val/8] ^= this->memory[this->index_register+i] >> offset;
+                    
+                    if(offset != 0)
+                        vram[y_val+i][x_val/8 + 1] ^= this->memory[this->index_register+i] << (8 - offset);
+                }
+                this->requires_redraw = true;
+                
             }
-            this->requires_redraw = true;
             break;
         case 0xE:
             switch (op_lower(opcode)) {
@@ -191,4 +202,5 @@ void Chip8::execute_instruction(uint16_t opcode){
             printf("Bruh - invalid instruction\n");
             break;
     }
+    return 0;
 }

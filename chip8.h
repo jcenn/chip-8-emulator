@@ -24,6 +24,6 @@ struct Chip8{
     
     int load_rom(char* file_path);
     void step();
-    void execute_instruction(uint16_t opcode);
+    uint8_t execute_instruction(uint16_t opcode);
 };
 
