@@ -15,9 +15,15 @@ struct Chip8{
 	// Internal only
 	uint8_t memory[MEM_SIZE];
 	uint16_t stack[16];
-	uint16_t program_counter = 0;
+	uint16_t program_counter = 512;
 	uint8_t stack_pointer = 0;
-
+    // 64x32 screen
+    uint8_t vram[32][8];
+    
+    bool requires_redraw = false;
+    
+    int load_rom(char* file_path);
+    void step();
+    void execute_instruction(uint16_t opcode);
 };
 
-int load_file(char* file_path, Chip8* chip8);
