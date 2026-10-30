@@ -231,31 +231,34 @@ uint8_t Chip8::execute_instruction(uint16_t opcode){
                     // temporarily store in a 32bit variable to detect overflow
                     uint16_t sum = this->registers[x] + this->registers[y];
                     // overflow flag
-                    this->registers[VF] = sum > 255 ? 1 : 0;
+                    uint8_t flag = sum > 255 ? 1 : 0;
                     this->registers[x] = sum % 256; // discard the overflow
+                    this->registers[VF] = flag;
                 } break;
-                case 0x5:
+                case 0x5: {
                     // printf("SUB (reg1: %02x reg2: %02x) \n", x, y);
-                    this->registers[VF] = this->registers[y] > this->registers[x] ? 1 : 0;
+                    uint8_t flag = (this->registers[x] >= this->registers[y]) ? 1 : 0;
                     this->registers[x] -= this->registers[y];
-                    break;
-                case 0x6:
+                    this->registers[VF] = flag;
+                } break;
+                case 0x6: {
                     // printf("SHR (reg1: %02x reg2: %02x) \n", x, y);
-                    this->registers[VF] = this->registers[x] & 1; // write last bit of Vx to VF
+                    uint8_t flag = this->registers[x] & 1; // write last bit of Vx to VF
                     this->registers[x] = this->registers[x] >> 1;
-                    break;
-                case 0x7:
+                    this->registers[VF] = flag;
+                } break;
+                case 0x7: {
                     // printf("SUBN (reg1: %02x reg2: %02x) \n", x, y);
-                    this->registers[VF] = this->registers[y] > this->registers[x] ? 1 : 0;
+                    uint8_t flag = (this->registers[y] >= this->registers[x]) ? 1 : 0;
                     this->registers[x] = this->registers[y] - this->registers[x];
-                    break;
-                case 0xe:
+                    this->registers[VF] = flag;
+                } break;
+                case 0xe: {
                     // printf("SHL (reg1: %02x reg2: %02x) \n", x, y);
-                    this->registers[VF] = (this->registers[x] >> 15) & 1; // write msb of Vx to VF
+                    uint8_t flag = (this->registers[x] >> 7) & 1; // write msb of Vx to VF
                     this->registers[x] = this->registers[x] << 1;
-
-                    // TODO: VF flag
-                    break;
+                    this->registers[VF] = flag;
+                } break;
 
                 default:
                     printf("ERROR: illegal value in opcode 0x8???\n");
