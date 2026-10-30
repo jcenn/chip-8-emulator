@@ -1,1 +1,1 @@
-g++ -o main main.cpp chip8.cpp -g
+g++ -o main main.cpp chip8.cpp -g -lraylib

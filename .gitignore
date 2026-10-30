@@ -1,1 +1,4 @@
 main
+.direnv/
+.envrc
+flake.lock
