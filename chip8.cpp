@@ -1,6 +1,7 @@
 #include "chip8.h"
 #include <cstdint>
 #include <cstdio>
+#include <cstdlib>
 #include <filesystem>
 #include <cstring> // For memset
 #include "utils.h"
@@ -8,8 +9,108 @@
 // last register
 #define VF 15
 
+static uint8_t font[] = {
+// 0
+0xF0,
+0x90,
+0x90,
+0x90,
+0xF0,
+// 1,
+0x20,
+0x60,
+0x20,
+0x20,
+0x70,
+// 2,
+0xF0,
+0x10,
+0xF0,
+0x80,
+0xF0,
+// 3,
+0xF0,
+0x10,
+0xF0,
+0x10,
+0xF0,
+// 4,
+0x90,
+0x90,
+0xF0,
+0x10,
+0x10,
+// 5,
+0xF0,
+0x80,
+0xF0,
+0x10,
+0xF0,
+// 6,
+0xF0,
+0x80,
+0xF0,
+0x90,
+0xF0,
+// 7,
+0xF0,
+0x10,
+0x20,
+0x40,
+0x40,
+// 8,
+0xF0,
+0x90,
+0xF0,
+0x90,
+0xF0,
+// 9,
+0xF0,
+0x90,
+0xF0,
+0x10,
+0xF0,
+// A,
+0xF0,
+0x90,
+0xF0,
+0x90,
+0x90,
+// B,
+0xE0,
+0x90,
+0xE0,
+0x90,
+0xE0,
+// C,
+0xF0,
+0x80,
+0x80,
+0x80,
+0xF0,
+// D,
+0xE0,
+0x90,
+0x90,
+0x90,
+0xE0,
+// E,
+0xF0,
+0x80,
+0xF0,
+0x80,
+0xF0,
+// F,
+0xF0,
+0x80,
+0xF0,
+0x80,
+0x80,
+};
+
 Chip8::Chip8(){
     memset(memory, 0, MEM_SIZE);
+    memcpy(memory, font, 16*5);
     memset(vram, 0, 8*32);
     memset(registers, 0, 16);
     memset(stack, 0, 16);
@@ -172,10 +273,12 @@ uint8_t Chip8::execute_instruction(uint16_t opcode){
             this->index_register = addr;
             break;
         case 0xB:
-            printf("JMP to $%04x + V0\n", addr);
+            // printf("JMP to $%04x + V0\n", addr);
+            this->program_counter = addr + this->registers[0] - 2;
             break;
         case 0xC:
-            printf("RND (reg: %02x value: %04x)\n", x, lower);
+            // printf("RND (reg: %02x value: %04x)\n", x, lower);
+            this->registers[x] = (rand() % 256) & lower;
             break;
         case 0xD:
             // printf("DRAW (x: %02x y: %02x n: %04x) \n", this->registers[x], this->registers[y], lower & 0x0f);
@@ -197,6 +300,7 @@ uint8_t Chip8::execute_instruction(uint16_t opcode){
             break;
         case 0xE:
             switch (op_lower(opcode)) {
+                // TODO: those instructions require input handling
                 case 0x9E:
                     printf("SKIP (reg: %02x) \n", x);
                     break;
@@ -211,16 +315,19 @@ uint8_t Chip8::execute_instruction(uint16_t opcode){
         case 0xF:
             switch (op_lower(opcode)) {
                 case 0x07:
-                    printf("LD (reg: %02x) <- DT \n", x);
+                    // printf("LD (reg: %02x) <- DT \n", x);
+                    this->registers[x] = this->delay_timer;
                     break;
                 case 0x0A:
                     printf("WAIT FOR KEY (reg: %02x) \n", x);
                     break;
                 case 0x15:
-                    printf("LD (reg: %02x) -> DT \n", x);
+                    // printf("LD (reg: %02x) -> DT \n", x);
+                    this->delay_timer = this->registers[x];
                     break;
                 case 0x18:
-                    printf("LD (reg: %02x) -> ST \n", x);
+                    // printf("LD (reg: %02x) -> ST \n", x);
+                    this->sound_timer = this->registers[x];
                     break;
                 case 0x1E: //
                     // printf("ADD I + (reg: %02x) \n", x);
@@ -228,6 +335,11 @@ uint8_t Chip8::execute_instruction(uint16_t opcode){
                     break;
                 case 0x29:
                     printf("SET I = SPRITE (reg: %02x) \n", x);
+                    // The value of I is set to the location for the hexadecimal sprite corresponding to the value of Vx
+                    // Each sprite takes 5 bytes
+                    // We assume they're stored starting at mem addres 0x0
+
+                    this->index_register = 5 * this->registers[x];
                     break;
                 case 0x33: {
                     // printf("STORE BCD of (reg: %02x) \n", x);

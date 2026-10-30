@@ -1,6 +1,7 @@
 #include <chrono>
 #include <cstdint>
 #include<cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <ctime>
 
@@ -141,6 +142,7 @@ void main_loop(Chip8* chip8){
 }
 
 int main(int argc, char *argv[]){
+    srand(time(NULL));
     InitWindow(800, 450, "Chip-8 demo");
     SetTargetFPS(60);
 
