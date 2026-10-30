@@ -34,7 +34,7 @@ void print_program(Chip8* chip8){
         timespec t;
         t.tv_sec = 0;
         t.tv_nsec = std::floor(1.0/CLOCK_RATE * 1000 * 1000 * 1000);
-        nanosleep(&t, NULL);
+        // nanosleep(&t, NULL);
 
         // print the addres of current instruction address and instruction as pseudo-assembly
 		printf("%04x:\t", i);

@@ -1,8 +1,12 @@
 #include "chip8.h"
+#include <cstdint>
 #include <cstdio>
 #include <filesystem>
 #include <cstring> // For memset
 #include "utils.h"
+
+// last register
+#define VF 15
 
 Chip8::Chip8(){
     memset(memory, 0, MEM_SIZE);
@@ -56,7 +60,10 @@ uint8_t Chip8::execute_instruction(uint16_t opcode){
                     this->requires_redraw = true;
                     break;
                 case 0xee:
-                    printf("RET \n");
+                    // printf("RET \n");
+                    // ret - load return address from the stack then set PC to that value
+                    this->program_counter = this->stack[this->stack_pointer-1];
+                    this->stack_pointer--;
                     break;
             }
             break;
@@ -66,16 +73,31 @@ uint8_t Chip8::execute_instruction(uint16_t opcode){
             this->program_counter = addr - 2; // PC is automaticall incremented by 2 after this instruction so we have to offset that
             break;
         case 0x2:
-            printf("CALL %03x \n", addr);
+            // printf("2nnn \n");
+            // 2nnn call addr
+            this->stack_pointer++;
+            this->stack[this->stack_pointer-1]= this->program_counter;
+            this->program_counter = addr -2;
             break;
         case 0x3:
-            printf("Skip EQ (reg: %02x val: %04x) \n", x, lower);
+            // printf("Skip EQ (reg: %02x val: %04x) \n", x, lower);
+
+            // 3xnn: skip the next instruction if Vx == nn.
+            if (this->registers[x] == lower) {
+                this->program_counter += 2;
+            }
             break;
         case 0x4:
-            printf("Skip NEQ (reg: %02x val: %04x) \n", x, lower);
+            // 4xnn: skip the next instruction if Vx != nn.
+            if (this->registers[x] != lower) {
+                this->program_counter += 2;
+            }
             break;
         case 0x5:
-            printf("Skip Reg EQ (reg1: %02x reg2: %02x) \n", x, y);
+            // 5xy0: skip the next instruction if Vx == Vy.
+            if ((opcode & 0x00F) == 0 && this->registers[x] == this->registers[y]) {
+                this->program_counter += 2;
+            }
             break;
         case 0x6:
             // printf("MOV (reg: %02x val: %04x) \n", x, lower);
@@ -88,31 +110,50 @@ uint8_t Chip8::execute_instruction(uint16_t opcode){
         case 0x8:
             switch (op_lower(opcode) & 0x0f) {
                 case 0x0:
-                    printf("MOV (reg1: %02x reg2: %02x) \n", x, y);
+                    // printf("MOV (reg1: %02x reg2: %02x) \n", x, y);
+                    this->registers[x] = this->registers[y];
                     break;
                 case 0x1:
-                    printf("OR (reg1: %02x reg2: %02x) \n", x, y);
+                    // printf("OR (reg1: %02x reg2: %02x) \n", x, y);
+                    this->registers[x] |= this->registers[y];
                     break;
                 case 0x2:
-                    printf("AND (reg1: %02x reg2: %02x) \n", x, y);
+                    // printf("AND (reg1: %02x reg2: %02x) \n", x, y);
+                    this->registers[x] &= this->registers[y];
                     break;
                 case 0x3:
-                    printf("XOR (reg1: %02x reg2: %02x) \n", x, y);
+                    // printf("XOR (reg1: %02x reg2: %02x) \n", x, y);
+                    this->registers[x] ^= this->registers[y];
                     break;
-                case 0x4:
-                    printf("ADD (reg1: %02x reg2: %02x) \n", x, y);
-                    break;
+                case 0x4: {
+                    //printf("ADD (reg1: %02x reg2: %02x) \n", x, y);
+                    // temporarily store in a 32bit variable to detect overflow
+                    uint16_t sum = this->registers[x] + this->registers[y];
+                    // overflow flag
+                    this->registers[VF] = sum > 255 ? 1 : 0;
+                    this->registers[x] = sum % 256; // discard the overflow
+                } break;
                 case 0x5:
-                    printf("SUB (reg1: %02x reg2: %02x) \n", x, y);
+                    // printf("SUB (reg1: %02x reg2: %02x) \n", x, y);
+                    this->registers[VF] = this->registers[y] > this->registers[x] ? 1 : 0;
+                    this->registers[x] -= this->registers[y];
                     break;
                 case 0x6:
-                    printf("SHR (reg1: %02x reg2: %02x) \n", x, y);
+                    // printf("SHR (reg1: %02x reg2: %02x) \n", x, y);
+                    this->registers[VF] = this->registers[x] & 1; // write last bit of Vx to VF
+                    this->registers[x] = this->registers[x] >> 1;
                     break;
                 case 0x7:
-                    printf("SUBN (reg1: %02x reg2: %02x) \n", x, y);
+                    // printf("SUBN (reg1: %02x reg2: %02x) \n", x, y);
+                    this->registers[VF] = this->registers[y] > this->registers[x] ? 1 : 0;
+                    this->registers[x] = this->registers[y] - this->registers[x];
                     break;
                 case 0xe:
-                    printf("SHL (reg1: %02x reg2: %02x) \n", x, y);
+                    // printf("SHL (reg1: %02x reg2: %02x) \n", x, y);
+                    this->registers[VF] = (this->registers[x] >> 15) & 1; // write msb of Vx to VF
+                    this->registers[x] = this->registers[x] << 1;
+
+                    // TODO: VF flag
                     break;
 
                 default:
@@ -121,7 +162,10 @@ uint8_t Chip8::execute_instruction(uint16_t opcode){
             }
             break;
         case 0x9:
-            printf("Skip NEQ (reg1: %02x reg2: %02x) \n", x, y);
+            // 9xy0: skip the next instruction if Vx != Vy.
+            if ((opcode & 0x00F) == 0 && this->registers[x] != this->registers[y]) {
+                this->program_counter += 2;
+            }
             break;
         case 0xA:
             //printf("LD $%04x to reg I\n", addr);
@@ -178,20 +222,38 @@ uint8_t Chip8::execute_instruction(uint16_t opcode){
                 case 0x18:
                     printf("LD (reg: %02x) -> ST \n", x);
                     break;
-                case 0x1E:
-                    printf("ADD I + (reg: %02x) \n", x);
+                case 0x1E: //
+                    // printf("ADD I + (reg: %02x) \n", x);
+                    this->index_register += this->registers[x];
                     break;
                 case 0x29:
                     printf("SET I = SPRITE (reg: %02x) \n", x);
                     break;
-                case 0x33:
-                    printf("STORE BCD of (reg: %02x) \n", x);
-                    break;
+                case 0x33: {
+                    // printf("STORE BCD of (reg: %02x) \n", x);
+                    uint8_t tmp_x = this->registers[x];
+                    uint8_t ones = tmp_x % 10;
+                    tmp_x -= ones;
+                    tmp_x /= 10;
+                    uint8_t tens = tmp_x % 10;
+                    tmp_x -= tens;
+                    tmp_x /= 10;
+                    uint8_t hundreds = tmp_x % 10;
+                    this->memory[this->index_register] = hundreds;
+                    this->memory[this->index_register + 1] = tens;
+                    this->memory[this->index_register + 2] = ones;
+                } break;
                 case 0x55:
-                    printf("STORE registers up to (reg: %02x) \n", x);
+                    // printf("STORE registers up to (reg: %02x) \n", x);
+                    for(int i=0; i<=x; i++){
+                        this->memory[this->index_register + i] = this->registers[i];
+                    }
                     break;
                 case 0x65:
-                    printf("READ into registers up to (reg: %02x) \n", x);
+                    // printf("READ into registers up to (reg: %02x) \n", x);
+                    for(int i=0; i<=x; i++){
+                        this->registers[i] = this->memory[this->index_register + i];
+                    }
                     break;
                 default:
                     printf("ERROR: illegal value in opcode %04x \n", opcode);
