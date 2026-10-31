@@ -23,7 +23,7 @@
 const int SCREEN_HEIGHT = 32;
 const int SCREEN_WIDTH = 64;
 
-const int RL_SCREEN_SCALE = 8;
+const int RL_SCREEN_SCALE = 16;
 
 RenderTexture2D screenTexture;
 
@@ -128,7 +128,7 @@ void main_loop(Chip8* chip8){
             // printf("instruction %d: \n", pc);
             // printf("%04x \n", opcode);
             const bool is_draw_opcode = (opcode & 0xF000) == 0xD000;
-            // if (draw_call_executed && is_draw_opcode) break; // Leave the second draw pending until the next frame.
+            if (draw_call_executed && is_draw_opcode) break; // Leave the second draw pending until the next frame.
 
             // 2. execute instruction
             chip8->execute_instruction(opcode);
@@ -154,7 +154,7 @@ void main_loop(Chip8* chip8){
 
 int main(int argc, char *argv[]){
     srand(time(NULL));
-    InitWindow(800, 450, "Chip-8 demo");
+    InitWindow(SCREEN_WIDTH * RL_SCREEN_SCALE, SCREEN_HEIGHT * RL_SCREEN_SCALE, "Chip-8 demo");
     SetTargetFPS(60);
 
     screenTexture = LoadRenderTexture(SCREEN_WIDTH, SCREEN_HEIGHT);

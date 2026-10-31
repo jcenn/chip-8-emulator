@@ -196,9 +196,13 @@ uint8_t Chip8::execute_instruction(uint16_t opcode){
             this->registers[VF] = 0;
 
             for (int row = 0; row < height; ++row) {
-                const int screen_y = y_start + row;
+                int screen_y = y_start + row;
                 if (screen_y >= 32) {
-                    continue;
+                    if (this->wrap_sprites) {
+                        screen_y %= 32;
+                    } else {
+                        continue;
+                    }
                 }
 
                 const uint32_t sprite_address =
@@ -209,9 +213,17 @@ uint8_t Chip8::execute_instruction(uint16_t opcode){
 
                 const uint8_t sprite = this->memory[sprite_address];
                 for (int col = 0; col < 8; ++col) {
-                    const int screen_x = x_start + col;
-                    if (screen_x >= 64 || (sprite & (1u << (7 - col))) == 0) {
+                    if ((sprite & (1u << (7 - col))) == 0) {
                         continue;
+                    }
+
+                    int screen_x = x_start + col;
+                    if (screen_x >= 64) {
+                        if (this->wrap_sprites) {
+                            screen_x %= 64;
+                        } else {
+                            continue;
+                        }
                     }
 
                     const uint8_t pixel_mask = 1u << (7 - (screen_x % 8));
@@ -228,7 +240,6 @@ uint8_t Chip8::execute_instruction(uint16_t opcode){
         }
         case 0xE:
             switch (op_lower(opcode)) {
-                // TODO: those instructions require input handling
                 case 0x9E:
                     // printf("SKIP (reg: %02x) \n", x);
                     if(IsKeyDown(keyMap[this->registers[x]])) program_counter += 2;

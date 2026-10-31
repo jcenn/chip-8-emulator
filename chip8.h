@@ -130,6 +130,7 @@ struct Chip8{
     uint8_t vram[32][8];
     
     bool requires_redraw = false;
+    bool wrap_sprites = true; // false = clip (classic CHIP-8), true = wrap (Octo / XO-CHIP)
     
     int load_rom(char* file_path);
     void step();
