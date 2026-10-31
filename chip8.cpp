@@ -4,109 +4,12 @@
 #include <cstdlib>
 #include <filesystem>
 #include <cstring> // For memset
+#include <raylib.h>
 #include "utils.h"
+#include <cmath>
 
 // last register
 #define VF 15
-
-static uint8_t font[] = {
-// 0
-0xF0,
-0x90,
-0x90,
-0x90,
-0xF0,
-// 1,
-0x20,
-0x60,
-0x20,
-0x20,
-0x70,
-// 2,
-0xF0,
-0x10,
-0xF0,
-0x80,
-0xF0,
-// 3,
-0xF0,
-0x10,
-0xF0,
-0x10,
-0xF0,
-// 4,
-0x90,
-0x90,
-0xF0,
-0x10,
-0x10,
-// 5,
-0xF0,
-0x80,
-0xF0,
-0x10,
-0xF0,
-// 6,
-0xF0,
-0x80,
-0xF0,
-0x90,
-0xF0,
-// 7,
-0xF0,
-0x10,
-0x20,
-0x40,
-0x40,
-// 8,
-0xF0,
-0x90,
-0xF0,
-0x90,
-0xF0,
-// 9,
-0xF0,
-0x90,
-0xF0,
-0x10,
-0xF0,
-// A,
-0xF0,
-0x90,
-0xF0,
-0x90,
-0x90,
-// B,
-0xE0,
-0x90,
-0xE0,
-0x90,
-0xE0,
-// C,
-0xF0,
-0x80,
-0x80,
-0x80,
-0xF0,
-// D,
-0xE0,
-0x90,
-0x90,
-0x90,
-0xE0,
-// E,
-0xF0,
-0x80,
-0xF0,
-0x80,
-0xF0,
-// F,
-0xF0,
-0x80,
-0xF0,
-0x80,
-0x80,
-};
 
 Chip8::Chip8(){
     memset(memory, 0, MEM_SIZE);
@@ -134,15 +37,13 @@ int Chip8::load_rom(char* file_path){
         return 1;
     }
 
-    for(int i=0; i < byte_size; i+=2){
-        uint16_t tmp = 0;
-        int read_bytes = fread(&tmp, sizeof(uint8_t) * 2, 1, file);
-
-        // writing the 2 bytes in reverse order to convert from little to big endian
-        this->memory[512 + i] = tmp;
-        this->memory[512 + i + 1] = tmp >> 8;
+    size_t read_bytes = fread(&this->memory[512], sizeof(uint8_t), byte_size, file);
+    fclose(file);
+    if(read_bytes != byte_size){
+        printf("ERROR: could not read full ROM file\n");
+        return 1;
     }
-    
+
     return 0;
 }
 
@@ -243,8 +144,8 @@ uint8_t Chip8::execute_instruction(uint16_t opcode){
                 } break;
                 case 0x6: {
                     // printf("SHR (reg1: %02x reg2: %02x) \n", x, y);
-                    uint8_t flag = this->registers[x] & 1; // write last bit of Vx to VF
-                    this->registers[x] = this->registers[x] >> 1;
+                    uint8_t flag = this->registers[y] & 1; // write last bit of Vx to VF
+                    this->registers[x] = this->registers[y] >> 1;
                     this->registers[VF] = flag;
                 } break;
                 case 0x7: {
@@ -255,8 +156,8 @@ uint8_t Chip8::execute_instruction(uint16_t opcode){
                 } break;
                 case 0xe: {
                     // printf("SHL (reg1: %02x reg2: %02x) \n", x, y);
-                    uint8_t flag = (this->registers[x] >> 7) & 1; // write msb of Vx to VF
-                    this->registers[x] = this->registers[x] << 1;
+                    uint8_t flag = (this->registers[y] >> 7) & 1; // write msb of Vx to VF
+                    this->registers[x] = this->registers[y] << 1;
                     this->registers[VF] = flag;
                 } break;
 
@@ -283,32 +184,58 @@ uint8_t Chip8::execute_instruction(uint16_t opcode){
             // printf("RND (reg: %02x value: %04x)\n", x, lower);
             this->registers[x] = (rand() % 256) & lower;
             break;
-        case 0xD:
-            // printf("DRAW (x: %02x y: %02x n: %04x) \n", this->registers[x], this->registers[y], lower & 0x0f);
-            //TODO: need to handle offset lesser than 1 byte
-            {
-                uint8_t x_val = this->registers[x]; 
-                uint8_t y_val = this->registers[y];
-                const uint8_t offset = x_val % 8;
+        case 0xD: {
+            // chat generated opcode
+            // Capture coordinates before resetting VF in case Vx or Vy is VF.
+            // CHIP-8 wraps the sprite's starting coordinates into the screen,
+            // but clips sprite pixels that extend past the right/bottom edges.
+            const int x_start = this->registers[x] % 64;
+            const int y_start = this->registers[y] % 32;
+            const uint8_t height = lower & 0x0F;
 
-                for(int i=0; i < (lower & 0x0f); i++){
-                    vram[y_val+i][x_val/8] ^= this->memory[this->index_register+i] >> offset;
-                    
-                    if(offset != 0)
-                        vram[y_val+i][x_val/8 + 1] ^= this->memory[this->index_register+i] << (8 - offset);
+            this->registers[VF] = 0;
+
+            for (int row = 0; row < height; ++row) {
+                const int screen_y = y_start + row;
+                if (screen_y >= 32) {
+                    continue;
                 }
-                this->requires_redraw = true;
-                
+
+                const uint32_t sprite_address =
+                    static_cast<uint32_t>(this->index_register) + row;
+                if (sprite_address >= MEM_SIZE) {
+                    break;
+                }
+
+                const uint8_t sprite = this->memory[sprite_address];
+                for (int col = 0; col < 8; ++col) {
+                    const int screen_x = x_start + col;
+                    if (screen_x >= 64 || (sprite & (1u << (7 - col))) == 0) {
+                        continue;
+                    }
+
+                    const uint8_t pixel_mask = 1u << (7 - (screen_x % 8));
+                    uint8_t& screen_byte = this->vram[screen_y][screen_x / 8];
+                    if (screen_byte & pixel_mask) {
+                        this->registers[VF] = 1;
+                    }
+                    screen_byte ^= pixel_mask;
+                }
             }
+
+            this->requires_redraw = true;
             break;
+        }
         case 0xE:
             switch (op_lower(opcode)) {
                 // TODO: those instructions require input handling
                 case 0x9E:
-                    printf("SKIP (reg: %02x) \n", x);
+                    // printf("SKIP (reg: %02x) \n", x);
+                    if(IsKeyDown(keyMap[this->registers[x]])) program_counter += 2;
                     break;
                 case 0xA1:
-                    printf("SKIP NOT (reg: %02x) \n", x);
+                    // printf("SKIP NOT (reg: %02x) \n", x);
+                    if(!IsKeyDown(keyMap[this->registers[x]])) program_counter += 2;
                     break;
                 default:
                     printf("ERROR: illegal value in opcode 0xE???\n");
@@ -321,9 +248,25 @@ uint8_t Chip8::execute_instruction(uint16_t opcode){
                     // printf("LD (reg: %02x) <- DT \n", x);
                     this->registers[x] = this->delay_timer;
                     break;
-                case 0x0A:
-                    printf("WAIT FOR KEY (reg: %02x) \n", x);
-                    break;
+                case 0x0A: {
+                    // printf("WAIT FOR KEY (reg: %02x) \n", x);
+
+                    int pressed_key_index = -1;
+                    for(int i=0; i<16; i++){
+                        if(IsKeyReleased( keyMap[i])){
+                            pressed_key_index = i;
+                            break;
+                        }
+                    }
+
+                    // if we didn't detect a key press this instruction is repeated
+                    if(pressed_key_index < 0) {
+                        program_counter -= 2;
+                    }else{
+                        // printf("Detected press \n");
+                        this->registers[x] = pressed_key_index;
+                    }
+                } break;
                 case 0x15:
                     // printf("LD (reg: %02x) -> DT \n", x);
                     this->delay_timer = this->registers[x];
@@ -337,7 +280,7 @@ uint8_t Chip8::execute_instruction(uint16_t opcode){
                     this->index_register += this->registers[x];
                     break;
                 case 0x29:
-                    printf("SET I = SPRITE (reg: %02x) \n", x);
+                    // printf("SET I = SPRITE (reg: %02x) \n", x);
                     // The value of I is set to the location for the hexadecimal sprite corresponding to the value of Vx
                     // Each sprite takes 5 bytes
                     // We assume they're stored starting at mem addres 0x0
@@ -361,13 +304,15 @@ uint8_t Chip8::execute_instruction(uint16_t opcode){
                 case 0x55:
                     // printf("STORE registers up to (reg: %02x) \n", x);
                     for(int i=0; i<=x; i++){
-                        this->memory[this->index_register + i] = this->registers[i];
+                        this->memory[this->index_register] = this->registers[i];
+                        this->index_register++;
                     }
                     break;
                 case 0x65:
                     // printf("READ into registers up to (reg: %02x) \n", x);
                     for(int i=0; i<=x; i++){
-                        this->registers[i] = this->memory[this->index_register + i];
+                        this->registers[i] = this->memory[this->index_register];
+                        this->index_register++;
                     }
                     break;
                 default:

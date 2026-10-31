@@ -19,7 +19,6 @@
 /// - Read/Run modes for this emulator
 /// - Read whole rom file
 
-const uint16_t CLOCK_RATE = 30; // in Hz
 
 const int SCREEN_HEIGHT = 32;
 const int SCREEN_WIDTH = 64;
@@ -109,36 +108,48 @@ void draw_screen_raylib(uint8_t vram[32][8]){
 
 }
 
+const int INSTRUCTIONS_PER_FRAME = 500;
+
 void main_loop(Chip8* chip8){
     while(!WindowShouldClose()){
         // Clock
-        timespec t;
-        t.tv_sec = 0;
-        t.tv_nsec = std::floor(1.0/CLOCK_RATE * 1000 * 1000 * 1000);
-        nanosleep(&t, NULL);
+        // timespec t;
+        // t.tv_sec = 0;
+        // t.tv_nsec = std::floor(1.0/CLOCK_RATE * 1000 * 1000 * 1000);
+        // nanosleep(&t, NULL);
 
         // CPU Cycle
-       
-        // 1. fetch instruction
-        uint16_t pc = chip8->program_counter;
-        uint16_t opcode = chip8->memory[pc] << 8 | chip8->memory[pc+1];
-        // printf("instruction %d: \n", pc);
-        // printf("%04x \n", opcode);
-        
-        // 2. execute instruction
-        chip8->execute_instruction(opcode);
+        bool draw_call_executed = false;
+        for(int i=0; i < INSTRUCTIONS_PER_FRAME; i++){
 
-        if(chip8->requires_redraw){
-            //TODO: draw data from vram
-            //draw_screen_ascii(chip8->vram);
-            draw_screen_raylib(chip8->vram);
-            //std::this_thread::sleep_for(std::chrono::seconds(2));
+            // 1. fetch instruction
+            uint16_t pc = chip8->program_counter;
+            uint16_t opcode = chip8->memory[pc] << 8 | chip8->memory[pc+1];
+            // printf("instruction %d: \n", pc);
+            // printf("%04x \n", opcode);
+            const bool is_draw_opcode = (opcode & 0xF000) == 0xD000;
+            // if (draw_call_executed && is_draw_opcode) break; // Leave the second draw pending until the next frame.
+
+            // 2. execute instruction
+            chip8->execute_instruction(opcode);
+            chip8->program_counter += 2;
+            if (is_draw_opcode) draw_call_executed = true;
             chip8->requires_redraw = false;
         }
+
+        // Should be decremented at 60hz
+        if(chip8->delay_timer > 0) chip8->delay_timer--;
+        if(chip8->sound_timer > 0) chip8->sound_timer--;
+        // if(chip8->requires_redraw){
+            //TODO: draw data from vram
+            //draw_screen_ascii(chip8->vram);
+        draw_screen_raylib(chip8->vram);
+            //std::this_thread::sleep_for(std::chrono::seconds(2));
+        // }
         
         // 3. increment program counter
-        chip8->program_counter += 2;
     }
+    CloseWindow();
 }
 
 int main(int argc, char *argv[]){
