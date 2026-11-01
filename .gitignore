@@ -1,4 +1,5 @@
 main
+chip8
 .direnv/
 .envrc
 flake.lock
