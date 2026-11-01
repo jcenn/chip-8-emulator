@@ -71,8 +71,8 @@ uint8_t Chip8::execute_instruction(uint16_t opcode){
             break;
         case 0x1:
             //printf("GOTO %03x \n", addr);
-            if(addr < 512 || addr >= 4096) return 1; // ERROR: reading outside memory
-            this->program_counter = addr - 2; // PC is automaticall incremented by 2 after this instruction so we have to offset that
+            if(addr >= MEM_SIZE) return 1; // ERROR: reading outside memory
+            this->program_counter = addr - 2; // PC is automatically incremented by 2 after this instruction so we have to offset that
             break;
         case 0x2:
             // printf("2nnn \n");
